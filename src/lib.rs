@@ -4,8 +4,8 @@
 ///
 /// # Errors
 ///
-/// Returns an arror when startup failes. The placeholder implementation
-/// currently always scceeds.
+/// Returns an error when startup fails. The placeholder implementation
+/// currently always succeeds.
 pub fn run() -> std::io::Result<()> {
     println!("situation-puzzle-tui");
     Ok(())
