@@ -1,4 +1,5 @@
 //! Core library for situation-puzzle-tui.
+
 pub mod logging;
 
 /// Starts the application.
@@ -9,6 +10,5 @@ pub mod logging;
 /// currently always succeeds.
 pub fn run() -> std::io::Result<()> {
     tracing::info!("starting situation-puzzle-tui");
-    println!("situation-puzzle-tui");
     Ok(())
 }
