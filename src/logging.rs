@@ -26,6 +26,16 @@ pub enum LoggingError {
         source: std::io::Error,
     },
 
+    /// The log file could not be initialized in the log directory.
+    #[error("failed to initialize the log file in {path}")]
+    InitializeAppender {
+        /// The directory that contains the log file.
+        path: PathBuf,
+        /// The underlying appender error.
+        #[source]
+        source: tracing_appender::rolling::InitError,
+    },
+
     /// A global tracing subscriber was already installed.
     #[error("a global tracing subscriber is already installed")]
     InstallSubscriber(#[from] tracing::subscriber::SetGlobalDefaultError),
@@ -39,8 +49,8 @@ pub enum LoggingError {
 /// # Errors
 ///
 /// Returns an error if the platform data directory cannot be determined, if
-/// the log directory cannot be created, or if a global subscriber is already
-/// installed.
+/// the log directory cannot be created, if the log file cannot be initialized,
+/// or if a global subscriber is already installed.
 pub fn init() -> Result<WorkerGuard, LoggingError> {
     let project = ProjectDirs::from("", "", "situation-puzzle-tui")
         .ok_or(LoggingError::NoProjectDirectory)?;
@@ -50,7 +60,14 @@ pub fn init() -> Result<WorkerGuard, LoggingError> {
         source,
     })?;
 
-    let appender = tracing_appender::rolling::daily(&dir, "situation-puzzle-tui.log");
+    let appender = tracing_appender::rolling::RollingFileAppender::builder()
+        .rotation(tracing_appender::rolling::Rotation::DAILY)
+        .filename_prefix("situation-puzzle-tui.log")
+        .build(&dir)
+        .map_err(|source| LoggingError::InitializeAppender {
+            path: dir.clone(),
+            source,
+        })?;
     let (writer, guard) = tracing_appender::non_blocking(appender);
 
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
