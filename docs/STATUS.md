@@ -1,13 +1,13 @@
 # 進捗と引き継ぎ
 
 最終更新: 2026-11-29
-最終コミット: `c3b54b5 phase 0: add start screen and quit handling`
+最終コミット: `1b36327 docs: add pahse 0 handoff notes`（PLAN.md と STATUS.md の更新は未コミット）
 
 実装計画は `docs/PLAN.md`。このファイルは「今どこまで終わっていて、次に何をするか」を新しいセッションに引き継ぐためのもの。
 
 ## 現在のフェーズ
 
-**Phase 1（ドメイン）開始前。** Phase 0（準備）は完了している。
+**Phase 1（ドメイン）開始。** Phase 0（準備）は完了している。まず `Puzzle` の型から作る。
 
 ## Phase 0 で完成したもの
 
@@ -28,6 +28,16 @@
   - `q` か `Esc` で終了（`KeyEventKind::Press` のみ反応）
   - 80×24 のスナップショットテスト（`TestBackend` + `insta`）
 - 依存: `directories`、`thiserror`、`tracing`、`tracing-appender`、`tracing-subscriber`（`env-filter`）、`ratatui`、`crossterm`。dev 依存は `insta`
+
+## Phase 1 で決めたこと
+
+- 判定の名前: 質問への回答4種は `Answer`（Yes / No / Irrelevant / Partially）、最終解答の判定は `Verdict`（Correct / Close / Incorrect）。PLAN.md も同じ呼び方に更新済み
+- `PuzzleId` は `String` の newtype。ID の生成方法（Uuid か連番か）は Phase 3 で決める
+- `Language` はまず `English` / `Japanese` の2つ
+- `Puzzle` のフィールドは id・title・scenario・solution・hints・language・source の7つ。tags と created_at は Phase 3 で足す
+- `Puzzle` のフィールドは private。`Puzzle::new` が trim と空文字の検証を行い、空のタイトル・問題文・真相を持つ `Puzzle` を作れないようにする
+- ヒントは `Vec<String>`。trim して空のものは捨てる
+- ゲーム状態は `GameStatus`（Playing / Solved / GaveUp）
 
 ## ファイルの役割
 
@@ -61,15 +71,14 @@ cargo run
 
 ## 次にやること（Phase 1）
 
-`domain` モジュールを作り、IO なしのゲーム進行を型で表す。
-
-- `Puzzle`、`PuzzleId`（newtype）、`Language`、`Source`
-- `GameSession`、`Turn`、`Verdict`
-- ゲームの状態（Playing / Solved / GaveUp）を enum で表す
-- 終了後の質問はエラーにする
-- 単体テストで「質問数の数え方」「ギブアップ後は質問できない」などを表現する
-- `domain` から ratatui・tokio・reqwest に依存しない
+1. `src/domain/mod.rs` と `src/domain/puzzle.rs` を作り、`PuzzleId`、`Language`、`Source`、`Puzzle`、`PuzzleError` を定義する。テストを先に書く
+2. `GameSession`、`Turn`、`Answer`、`GameStatus` を作る。終了後の質問はエラーにする
+3. 単体テストで「質問数の数え方」「ギブアップ後は質問できない」などを表現する
+4. `domain` から ratatui・tokio・reqwest に依存していないことを確認する
 
 ## 未決事項
 
-`docs/PLAN.md` の「未決事項」を参照。Phase 1 の範囲では、`Puzzle` のフィールド構成（言語・出典・タグ・作成日時）をどこまで最初から持たせるかを決める必要がある。
+`docs/PLAN.md` の「未決事項」を参照。Phase 1 で残っているのは次の2点。
+
+- `PuzzleError` のバリエーション（空の URL を弾くか、など）
+- `GameSession` が `Puzzle` を所有するか、参照を持つか

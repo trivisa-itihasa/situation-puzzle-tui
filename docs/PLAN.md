@@ -1,6 +1,6 @@
 # situation-puzzle-tui 実装計画書
 
-最終更新: 2026-11-21
+最終更新: 2026-11-29
 
 ## 概要とゴール
 
@@ -24,6 +24,7 @@ LLM 接続は「OpenAI互換API（BYOK）」と「Sign in with ChatGPT」の2本
 | 問題の作成 | 手動で書く、LLM に生成させる、の両方 | 生成した問題は Editor で確認・修正してから保存する |
 | Web からの取得 | LLM が Web 検索で問題を探す | 検索そのものはアプリが行い、LLM には結果だけを渡す（アーキテクチャの章） |
 | 出題 | LLM が出題者として回答・ヒント・解答判定を行う | 回答は Yes / No / Irrelevant / Partially の4種類 |
+| 判定の呼び分け | 質問への回答4種は `Answer`、最終解答の判定は `Verdict` | 回答は毎ターン、判定は最後に1回。名前を分けて取り違えを防ぐ |
 | LLM 接続（BYOK） | OpenAI 互換の Chat Completions 形式なら何でも | base URL・モデル名・API キーを設定する。DeepSeek や Ollama も対象 |
 | ChatGPT ログイン | OpenAI 公式の Sign in with ChatGPT を使う | ChatGPT Plus / Pro が必要。Responses API 経由で呼ぶ |
 | UI の言語 | 当面は英語。将来、設定で切り替える | 最初から UI 文字列を1か所に集めておく |
@@ -86,7 +87,7 @@ flowchart TD
         auth["auth<br/>OAuth・PKCE"]
     end
     external[("アプリの外<br/>LLM API・Web ページ・ファイル・ブラウザ")]
-    domain["domain<br/>Puzzle・GameSession・Verdict（IO なし）"]
+    domain["domain<br/>Puzzle・GameSession・Answer・Verdict（IO なし）"]
 
     ui --> i18n
     ui --> app
@@ -157,7 +158,7 @@ BYOK は Chat Completions 形式、ChatGPT ログインは Responses API と、�
 プロンプトは `llm::prompts` に関数として集め、出力形式は JSON を指示する。応答は `llm::parse` で構造体に変換し、コードフェンスや前後の余計な文があっても読めるようにする。出題者の応答はたとえば次の形になる。
 
 ```json
-{ "verdict": "no", "comment": "Think about why he wanted water." }
+{ "answer": "no", "comment": "Think about why he wanted water." }
 ```
 
 ### Web 検索（Discover）
@@ -232,7 +233,9 @@ edition 2024 でプロジェクトを作り、`lib.rs` と `main.rs` に分け�
 
 ### Phase 1: ドメイン
 
-`Puzzle`、`PuzzleId`（newtype）、`Language`、`Source` と、`GameSession`、`Turn`、`Verdict` を作る。ゲームの状態（プレイ中・正解・ギブアップ）は enum で表し、終了後の質問などはエラーにする。
+`Puzzle`、`PuzzleId`（String の newtype）、`Language`、`Source` と、`Answer`（回答4種）、`GameSession`、`Turn`、`Verdict`（最終判定）を作る。ゲームの状態（プレイ中・正解・ギブアップ）は `GameStatus` という enum で表し、終了後の質問などはエラーにする。
+
+`Puzzle` は id・title・scenario・solution・hints・language・source だけを持ち、tags と created_at は Phase 3 の保存設計で足す。フィールドは private にして `Puzzle::new` で検証し、空のタイトルや問題文を持つ `Puzzle` を作れないようにする。`Language` はまず English と Japanese の2つ。
 
 完了の目安: ゲーム進行のルールを単体テストで説明できる。
 
@@ -256,7 +259,7 @@ Chat Completions のクライアント、LLM プロファイル（base URL・モ
 
 ### Phase 5: 生成・判定・ストリーミング
 
-テーマと言語を指定した問題生成、真相を見ずに遊ぶ「生成してすぐ遊ぶ」、ヒント、最終解答の判定（Correct / Close / Incorrect）を作る。真相の解説など長い文章は SSE で逐次表示する。
+テーマと言語を指定した問題生成、真相を見ずに遊ぶ「生成してすぐ遊ぶ」、ヒント、最終解答の判定 `Verdict`（Correct / Close / Incorrect）を作る。真相の解説など長い文章は SSE で逐次表示する。
 
 完了の目安: LLM が作った問題を、真相を見ずに解答判定まで遊べる。
 
@@ -287,7 +290,7 @@ PKCE の生成、ローカルのコールバックサーバー、ブラウザ起
 | domain | 単体テスト（`#[cfg(test)]`） | 質問数の数え方、ギブアップ後は質問できない |
 | app::update | Action を与え、State の変化と返る Effect を確かめる | Enter で LLM 呼び出しの Effect が出る |
 | ui | `TestBackend` で描画し、insta でスナップショット | 80×24 の Play 画面、日本語の問題文 |
-| llm のパース | 文字列を入力して構造体を確かめる | コードフェンス付き JSON、未知の verdict |
+| llm のパース | 文字列を入力して構造体を確かめる | コードフェンス付き JSON、未知の answer |
 | llm の HTTP | wiremock で API を模擬する | 成功、401、429、SSE の途中切断 |
 | storage | tempfile の一時ディレクトリを使う | 保存して読み込むと元に戻る |
 | 実 API | `#[ignore]` を付けて手動で実行 | 環境変数があるときだけ動かす |
