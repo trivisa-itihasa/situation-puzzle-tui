@@ -27,3 +27,6 @@ rustc-ice-*.txt
 # Added by cargo
 
 /target
+
+# pre-reviewed snapshots
+*.snap.new
